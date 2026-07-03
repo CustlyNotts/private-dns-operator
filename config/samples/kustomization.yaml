@@ -1,0 +1,4 @@
+resources:
+  - dns_v1alpha1_privatednszone.yaml
+  - dns_v1alpha1_privatednsrecord.yaml
+  - dns_v1alpha1_privatednsrecord_second_ip.yaml

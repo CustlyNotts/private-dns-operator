@@ -1,0 +1,14 @@
+apiVersion: dns.custlynotts.io/v1alpha1
+kind: PrivateDNSZone
+metadata:
+  name: rancher
+spec:
+  zone: rancher.io
+  ttl: 300
+  unresolvedRecordPolicy: Forward
+  allowedNamespaces: {}
+  records:
+    - name: info
+      type: TXT
+      values:
+        - Rancher private in-cluster DNS zone

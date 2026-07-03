@@ -1,0 +1,79 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: private-dns-operator
+rules:
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones
+      - privatednsrecords
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones/status
+      - privatednsrecords/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: private-dns-operator-coredns
+  namespace: kube-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - coredns
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    resourceNames:
+      - coredns
+    verbs:
+      - get
+      - update
+      - patch

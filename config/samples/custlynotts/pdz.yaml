@@ -1,0 +1,14 @@
+apiVersion: dns.custlynotts.io/v1alpha1
+kind: PrivateDNSZone
+metadata:
+  name: custlynotts
+spec:
+  zone: custlynotts.io
+  ttl: 300
+  unresolvedRecordPolicy: NXDOMAIN
+  allowedNamespaces: {}
+  records:
+    - name: info
+      type: TXT
+      values:
+        - Custlynotts private in-cluster DNS zone

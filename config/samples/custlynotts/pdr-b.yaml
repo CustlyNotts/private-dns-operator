@@ -1,0 +1,13 @@
+apiVersion: dns.custlynotts.io/v1alpha1
+kind: PrivateDNSRecord
+metadata:
+  name: custlynotts-git-b
+  namespace: default
+spec:
+  zoneRef:
+    name: custlynotts
+  name: audit
+  type: A
+  ttl: 60
+  values:
+    - 127.208.213.127

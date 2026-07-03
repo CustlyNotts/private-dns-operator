@@ -1,0 +1,13 @@
+apiVersion: dns.custlynotts.io/v1alpha1
+kind: PrivateDNSRecord
+metadata:
+  name: custlynotts-git-a
+  namespace: default
+spec:
+  zoneRef:
+    name: custlynotts
+  name: gitlab
+  type: A
+  ttl: 60
+  values:
+    - 127.208.213.149

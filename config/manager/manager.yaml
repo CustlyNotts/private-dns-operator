@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: private-dns-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: private-dns-operator
+  namespace: private-dns-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: private-dns-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: private-dns-operator
+    spec:
+      serviceAccountName: private-dns-operator
+      containers:
+        - name: manager
+          image: ghcr.io/custlynotts/private-dns-operator:v1.0.0
+          args:
+            - --leader-elect
+            - --coredns-namespace=$(PRIVATE_DNS_COREDNS_NAMESPACE)
+            - --coredns-configmap=$(PRIVATE_DNS_COREDNS_CONFIGMAP)
+            - --coredns-deployment=$(PRIVATE_DNS_COREDNS_DEPLOYMENT)
+          env:
+            - name: PRIVATE_DNS_COREDNS_NAMESPACE
+              value: kube-system
+            - name: PRIVATE_DNS_COREDNS_CONFIGMAP
+              value: coredns
+            - name: PRIVATE_DNS_COREDNS_DEPLOYMENT
+              value: coredns
+          ports:
+            - name: metrics
+              containerPort: 8080
+            - name: health
+              containerPort: 8081
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health

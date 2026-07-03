@@ -1,0 +1,3 @@
+resources:
+  - bases/dns.custlynotts.io_privatednszones.yaml
+  - bases/dns.custlynotts.io_privatednsrecords.yaml

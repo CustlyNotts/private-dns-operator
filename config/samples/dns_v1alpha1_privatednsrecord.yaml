@@ -1,0 +1,13 @@
+apiVersion: dns.custlynotts.io/v1alpha1
+kind: PrivateDNSRecord
+metadata:
+  name: rancher-git-a
+  namespace: default
+spec:
+  zoneRef:
+    name: rancher
+  name: git
+  type: A
+  ttl: 60
+  values:
+    - 34.208.213.149
