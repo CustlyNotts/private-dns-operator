@@ -4,3 +4,5 @@ dist/
 
 .DS_Store
 .cache/
+
+docs/medium-article.md
