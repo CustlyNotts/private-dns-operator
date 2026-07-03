@@ -163,13 +163,13 @@ rancher.io:53 {
 
 ## Helm Install
 
-Install the released chart from GHCR:
+Install or upgrade the released chart from GHCR:
 
 ```bash
-helm install private-dns-operator \
+helm upgrade --install private-dns-operator \
   oci://ghcr.io/custlynotts/charts/private-dns-operator \
   --version 1.0.1 \
-  --namespace private-dns-system \
+  --namespace private-dns-operator-system \
   --create-namespace
 ```
 
@@ -178,18 +178,18 @@ The GitHub release tag, image tag, chart `appVersion`, and chart package version
 Install from the local chart while developing:
 
 ```bash
-helm install private-dns-operator ./charts/private-dns-operator \
-  --namespace private-dns-system \
+helm upgrade --install private-dns-operator ./charts/private-dns-operator \
+  --namespace private-dns-operator-system \
   --create-namespace
 ```
 
 Override the CoreDNS target from values:
 
 ```bash
-helm install private-dns-operator \
+helm upgrade --install private-dns-operator \
   oci://ghcr.io/custlynotts/charts/private-dns-operator \
   --version 1.0.1 \
-  --namespace private-dns-system \
+  --namespace private-dns-operator-system \
   --create-namespace \
   --set coredns.namespace=kube-system \
   --set coredns.configMap=coredns \
@@ -325,5 +325,4 @@ oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.0.1
 ## Known Limitations
 
 - Admission webhooks are not included yet; validation currently happens during reconcile.
-- Helm chart packaging is planned; the static manifests are ready for values-driven templating.
 - Autodiscovery of CoreDNS resources is intentionally not enabled. CoreDNS targets are explicit for safety.
