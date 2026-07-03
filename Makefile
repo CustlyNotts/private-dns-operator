@@ -1,4 +1,4 @@
-GOCACHE ?= /private/tmp/private-dns-go-build
+GOCACHE ?= $(CURDIR)/.cache/go-build
 VERSION ?= v1.0.0
 IMG ?= ghcr.io/custlynotts/private-dns-operator:$(VERSION)
 LATEST_IMG ?= ghcr.io/custlynotts/private-dns-operator:latest
