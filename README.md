@@ -161,6 +161,40 @@ rancher.io:53 {
 - `PrivateDNSRecord` deletion is handled by deterministic full-state rendering from remaining CRs.
 - CoreDNS `reload` is preferred. If `reload` is absent or volume items changed, the CoreDNS Deployment pod template is annotated to trigger a rollout restart.
 
+## Helm Install
+
+Install with the chart:
+
+```bash
+helm install private-dns-operator ./charts/private-dns-operator \
+  --namespace private-dns-system \
+  --create-namespace
+```
+
+Override the CoreDNS target from values:
+
+```bash
+helm install private-dns-operator ./charts/private-dns-operator \
+  --namespace private-dns-system \
+  --create-namespace \
+  --set coredns.namespace=kube-system \
+  --set coredns.configMap=coredns \
+  --set coredns.deployment=coredns
+```
+
+Package the chart:
+
+```bash
+make helm-package
+```
+
+Validate the chart locally:
+
+```bash
+make helm-lint
+make helm-template
+```
+
 ## Install
 
 Install CRDs, RBAC, and manager:

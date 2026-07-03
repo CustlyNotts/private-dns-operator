@@ -21,7 +21,7 @@ spec:
       serviceAccountName: private-dns-operator
       containers:
         - name: manager
-          image: ghcr.io/custlynotts/private-dns-operator:v1.0.0
+          image: ghcr.io/custlynotts/private-dns-operator:v1.0.1
           args:
             - --leader-elect
             - --coredns-namespace=$(PRIVATE_DNS_COREDNS_NAMESPACE)

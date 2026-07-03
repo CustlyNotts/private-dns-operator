@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.1
+
+### Added
+
+- Helm lint, template, and package Makefile targets.
+- CI validation for Helm chart linting and rendering.
+- Release workflow chart packaging and GitHub release asset upload.
+
+### Fixed
+
+- Use a repo-local Go build cache so CI runners do not depend on macOS-specific `/private/tmp`.
+
 ## v1.0.0
 
 Initial release of `private-dns-operator`.

@@ -1,0 +1,116 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "private-dns-operator.fullname" . }}
+  labels:
+    {{- include "private-dns-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones
+      - privatednsrecords
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones/status
+      - privatednsrecords/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - dns.custlynotts.io
+    resources:
+      - privatednszones/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "private-dns-operator.fullname" . }}
+  labels:
+    {{- include "private-dns-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "private-dns-operator.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "private-dns-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "private-dns-operator.fullname" . }}-coredns
+  namespace: {{ .Values.coredns.namespace }}
+  labels:
+    {{- include "private-dns-operator.labels" . | nindent 4 }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    resourceNames:
+      - {{ .Values.coredns.configMap | quote }}
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    resourceNames:
+      - {{ .Values.coredns.deployment | quote }}
+    verbs:
+      - get
+      - update
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "private-dns-operator.fullname" . }}-coredns
+  namespace: {{ .Values.coredns.namespace }}
+  labels:
+    {{- include "private-dns-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "private-dns-operator.fullname" . }}-coredns
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "private-dns-operator.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

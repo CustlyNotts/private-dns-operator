@@ -1,0 +1,18 @@
+apiVersion: v2
+name: private-dns-operator
+description: Kubernetes-native private DNS zone management for CoreDNS.
+type: application
+version: 1.0.1
+appVersion: v1.0.1
+home: https://github.com/CustlyNotts/private-dns-operator
+sources:
+  - https://github.com/CustlyNotts/private-dns-operator
+keywords:
+  - kubernetes
+  - coredns
+  - dns
+  - operator
+  - private-dns
+  - platform-engineering
+maintainers:
+  - name: CustlyNotts

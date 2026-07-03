@@ -1,0 +1,112 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: privatednsrecords.dns.custlynotts.io
+spec:
+  group: dns.custlynotts.io
+  scope: Namespaced
+  names:
+    plural: privatednsrecords
+    singular: privatednsrecord
+    kind: PrivateDNSRecord
+    shortNames:
+      - pdr
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Zone
+          type: string
+          jsonPath: .spec.zoneRef.name
+        - name: Name
+          type: string
+          jsonPath: .spec.name
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: FQDN
+          type: string
+          jsonPath: .status.fqdn
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              required:
+                - zoneRef
+                - name
+                - type
+                - values
+              properties:
+                zoneRef:
+                  type: object
+                  required:
+                    - name
+                  properties:
+                    name:
+                      type: string
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                    - A
+                    - AAAA
+                    - CNAME
+                    - TXT
+                    - MX
+                    - SRV
+                ttl:
+                  type: integer
+                  format: int32
+                  minimum: 1
+                values:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                fqdn:
+                  type: string
+                conditions:
+                  type: array
+                  x-kubernetes-list-type: map
+                  x-kubernetes-list-map-keys:
+                    - type
+                  items:
+                    type: object
+                    required:
+                      - type
+                      - status
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      observedGeneration:
+                        type: integer
+                        format: int64
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string

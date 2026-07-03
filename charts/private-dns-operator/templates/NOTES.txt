@@ -1,0 +1,12 @@
+private-dns-operator has been installed.
+
+CoreDNS target:
+  Namespace:  {{ .Values.coredns.namespace }}
+  ConfigMap:  {{ .Values.coredns.configMap }}
+  Deployment: {{ .Values.coredns.deployment }}
+
+Check the operator:
+  kubectl -n {{ .Release.Namespace }} get deploy {{ include "private-dns-operator.fullname" . }}
+
+Try the samples from the repository:
+  kubectl apply -f config/samples/
