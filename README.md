@@ -163,7 +163,19 @@ rancher.io:53 {
 
 ## Helm Install
 
-Install with the chart:
+Install the released chart from GHCR:
+
+```bash
+helm install private-dns-operator \
+  oci://ghcr.io/custlynotts/charts/private-dns-operator \
+  --version 1.0.1 \
+  --namespace private-dns-system \
+  --create-namespace
+```
+
+The GitHub release tag, image tag, chart `appVersion`, and chart package version are kept in lockstep. For a git tag `v1.0.1`, the image tag is `v1.0.1` and the Helm chart version is `1.0.1`.
+
+Install from the local chart while developing:
 
 ```bash
 helm install private-dns-operator ./charts/private-dns-operator \
@@ -174,7 +186,9 @@ helm install private-dns-operator ./charts/private-dns-operator \
 Override the CoreDNS target from values:
 
 ```bash
-helm install private-dns-operator ./charts/private-dns-operator \
+helm install private-dns-operator \
+  oci://ghcr.io/custlynotts/charts/private-dns-operator \
+  --version 1.0.1 \
   --namespace private-dns-system \
   --create-namespace \
   --set coredns.namespace=kube-system \
@@ -182,10 +196,16 @@ helm install private-dns-operator ./charts/private-dns-operator \
   --set coredns.deployment=coredns
 ```
 
-Package the chart:
+Package the chart using the same version as the release tag:
 
 ```bash
-make helm-package
+make helm-package VERSION=v1.0.1
+```
+
+Push the chart to GHCR manually if needed:
+
+```bash
+make helm-push VERSION=v1.0.1
 ```
 
 Validate the chart locally:
@@ -286,17 +306,20 @@ make docker-push VERSION=v1.0.0
 
 The first release tag is `v1.0.0`.
 
-When a `v*.*.*` tag is pushed, `.github/workflows/release.yaml` builds and publishes:
+When a `v*.*.*` tag is pushed, `.github/workflows/release.yaml` builds and publishes the image and Helm chart together:
 
 ```text
 ghcr.io/custlynotts/private-dns-operator:<tag>
 ghcr.io/custlynotts/private-dns-operator:latest
+oci://ghcr.io/custlynotts/charts/private-dns-operator --version <tag without v>
 ```
 
-For `v1.0.0`, the release image is:
+For `v1.0.1`, the release artifacts are:
 
 ```text
-ghcr.io/custlynotts/private-dns-operator:v1.0.0
+ghcr.io/custlynotts/private-dns-operator:v1.0.1
+ghcr.io/custlynotts/private-dns-operator:latest
+oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.0.1
 ```
 
 ## Known Limitations

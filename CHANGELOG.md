@@ -7,6 +7,7 @@
 - Helm lint, template, and package Makefile targets.
 - CI validation for Helm chart linting and rendering.
 - Release workflow chart packaging and GitHub release asset upload.
+- Publish Helm charts to GHCR as OCI artifacts with versions kept in lockstep with release tags.
 
 ### Fixed
 

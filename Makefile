@@ -1,7 +1,10 @@
 GOCACHE ?= $(CURDIR)/.cache/go-build
 VERSION ?= v1.0.1
+HELM_VERSION ?= $(patsubst v%,%,$(VERSION))
+HELM_APP_VERSION ?= $(VERSION)
 IMG ?= ghcr.io/custlynotts/private-dns-operator:$(VERSION)
 LATEST_IMG ?= ghcr.io/custlynotts/private-dns-operator:latest
+HELM_OCI_REGISTRY ?= oci://ghcr.io/custlynotts/charts
 
 .PHONY: test
 test:
@@ -47,4 +50,8 @@ helm-template:
 .PHONY: helm-package
 helm-package:
 	mkdir -p $(HELM_PACKAGE_DIR)
-	helm package $(HELM_CHART) --destination $(HELM_PACKAGE_DIR)
+	helm package $(HELM_CHART) --version $(HELM_VERSION) --app-version $(HELM_APP_VERSION) --destination $(HELM_PACKAGE_DIR)
+
+.PHONY: helm-push
+helm-push: helm-package
+	helm push $(HELM_PACKAGE_DIR)/private-dns-operator-$(HELM_VERSION).tgz $(HELM_OCI_REGISTRY)
