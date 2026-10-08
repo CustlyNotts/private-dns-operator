@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: ghcr.io/custlynotts/private-dns-operator:v1.0.1
+          image: ghcr.io/custlynotts/private-dns-operator:v1.1.0
           args:
             - --leader-elect
             - --coredns-namespace=$(PRIVATE_DNS_COREDNS_NAMESPACE)

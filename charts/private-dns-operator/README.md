@@ -12,7 +12,7 @@ reference and DNS semantics.
 ```bash
 helm upgrade --install private-dns-operator \
   oci://ghcr.io/custlynotts/charts/private-dns-operator \
-  --version 1.0.1 \
+  --version 1.1.0 \
   --namespace private-dns-operator-system \
   --create-namespace
 ```
@@ -22,8 +22,8 @@ on `helm upgrade` or `helm uninstall`, so apply CRD changes yourself when a
 release notes them:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.0.1/config/crd/bases/dns.custlynotts.io_privatednszones.yaml
-kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.0.1/config/crd/bases/dns.custlynotts.io_privatednsrecords.yaml
+kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.1.0/config/crd/bases/dns.custlynotts.io_privatednszones.yaml
+kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.1.0/config/crd/bases/dns.custlynotts.io_privatednsrecords.yaml
 ```
 
 ## Requirements

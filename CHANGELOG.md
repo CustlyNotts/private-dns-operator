@@ -4,11 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.1.0 - 2026-10-08
 
-Prepared for open-source release. The behaviour changes below are
-backward-compatible with existing `PrivateDNSZone` and `PrivateDNSRecord`
-objects, so this is a minor version.
+First open-source release. The behaviour changes below are backward-compatible
+with existing `PrivateDNSZone` and `PrivateDNSRecord` objects, so this is a
+minor version rather than a major one.
+
+Note for anyone running v1.0.x on arm64: those images contained an x86-64
+binary, so this is the first release with a working `linux/arm64` image.
 
 ### Added
 
