@@ -1,6 +1,12 @@
 bin/
 dist/
+.cache/
 .git/
 .github/
-.DS_Store
+charts/
+docs/
+e2e/
+cover.out
 *.test
+*.md
+.DS_Store
