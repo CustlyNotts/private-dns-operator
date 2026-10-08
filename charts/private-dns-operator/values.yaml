@@ -1,8 +1,13 @@
+# Number of operator replicas. Leader election keeps only one active, so more
+# than one replica buys failover, not throughput.
 replicaCount: 1
 
 image:
   repository: ghcr.io/custlynotts/private-dns-operator
-  tag: v1.0.1
+  # Leave empty to track the chart's appVersion, which the release workflow
+  # sets in lockstep with the image tag. Pinning a tag here overrides that and
+  # will silently keep an old image across chart upgrades.
+  tag: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
@@ -30,7 +35,14 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
 
-resources: {}
+# Modest defaults for a controller that only reconciles on CR and CoreDNS
+# changes. Raise the memory limit if you manage a large number of zones.
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
 
 nodeSelector: {}
 tolerations: []
@@ -41,10 +53,26 @@ leaderElection:
 
 metrics:
   bindAddress: ":8080"
+  # The metrics endpoint is served without authentication, so no Service is
+  # created by default. Enable it only on a cluster where reaching the port is
+  # already restricted, for example by a NetworkPolicy.
+  service:
+    enabled: false
+    type: ClusterIP
+    port: 8080
+    annotations: {}
+  # Requires the Prometheus Operator CRDs, and metrics.service.enabled.
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
 
 healthProbe:
   bindAddress: ":8081"
 
+# The CoreDNS resources the operator is allowed to manage. The generated Role
+# is scoped to exactly these names, so changing them here also moves the RBAC.
 coredns:
   namespace: kube-system
   configMap: coredns
@@ -53,6 +81,7 @@ coredns:
 rbac:
   create: true
 
-
+# Extra manager flags, for example ["--zap-log-level=debug"].
 extraArgs: []
+# Extra container environment variables, in standard Kubernetes env form.
 extraEnv: []
