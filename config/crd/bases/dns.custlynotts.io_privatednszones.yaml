@@ -1,132 +1,245 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: privatednszones.dns.custlynotts.io
 spec:
   group: dns.custlynotts.io
-  scope: Cluster
   names:
-    plural: privatednszones
-    singular: privatednszone
     kind: PrivateDNSZone
+    listKind: PrivateDNSZoneList
+    plural: privatednszones
     shortNames:
-      - pdz
+    - pdz
+    singular: privatednszone
+  scope: Cluster
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Zone
-          type: string
-          jsonPath: .spec.zone
-        - name: Policy
-          type: string
-          jsonPath: .spec.unresolvedRecordPolicy
-        - name: Ready
-          type: string
-          jsonPath: .status.conditions[?(@.type=="Ready")].status
-      schema:
-        openAPIV3Schema:
-          type: object
-          required:
-            - spec
-          properties:
-            apiVersion:
-              type: string
-            kind:
-              type: string
-            metadata:
-              type: object
-            spec:
-              type: object
-              required:
-                - zone
-              properties:
-                zone:
-                  type: string
-                ttl:
-                  type: integer
-                  format: int32
-                  minimum: 1
-                unresolvedRecordPolicy:
-                  type: string
-                  enum:
-                    - Forward
-                    - NXDOMAIN
-                allowedNamespaces:
-                  type: object
+  - additionalPrinterColumns:
+    - jsonPath: .spec.zone
+      name: Zone
+      type: string
+    - jsonPath: .spec.unresolvedRecordPolicy
+      name: Policy
+      type: string
+    - jsonPath: .status.records
+      name: Records
+      type: integer
+    - jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PrivateDNSZone is a private DNS zone rendered into CoreDNS.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PrivateDNSZoneSpec defines the desired state of a private
+              DNS zone.
+            properties:
+              allowedNamespaces:
+                description: |-
+                  AllowedNamespaces restricts which namespaces may publish
+                  PrivateDNSRecord objects into this zone.
+                properties:
+                  matchNames:
+                    description: |-
+                      MatchNames lists namespaces allowed to contribute PrivateDNSRecord objects.
+                      An empty list allows every namespace, so set this explicitly on any zone
+                      exposed to tenants.
+                    items:
+                      type: string
+                    type: array
+                type: object
+              records:
+                description: |-
+                  Records declares records inline on the zone, in addition to any
+                  PrivateDNSRecord objects that reference it.
+                items:
+                  description: |-
+                    PrivateDNSRecordSpecInline is a record declared directly on the zone, for
+                    records the zone owner does not want to delegate.
                   properties:
-                    matchNames:
-                      type: array
+                    name:
+                      description: |-
+                        Name is the record name relative to the zone. Use "@" or an empty string
+                        for the zone apex, or a fully qualified name ending in a dot that falls
+                        inside the zone.
+                      maxLength: 253
+                      type: string
+                    ttl:
+                      description: TTL overrides the zone TTL for this record, in
+                        seconds.
+                      format: int32
+                      maximum: 2147483647
+                      minimum: 1
+                      type: integer
+                    type:
+                      description: Type is the DNS record type.
+                      enum:
+                      - A
+                      - AAAA
+                      - CNAME
+                      - TXT
+                      - MX
+                      - SRV
+                      type: string
+                    values:
+                      description: |-
+                        Values holds the record data. The accepted format depends on Type:
+                        an IPv4 address for A, an IPv6 address for AAAA, a hostname for CNAME,
+                        free text for TXT, "<priority> <host>" for MX, and
+                        "<priority> <weight> <port> <target>" for SRV.
                       items:
                         type: string
-                records:
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - name
-                      - type
-                      - values
-                    properties:
-                      name:
-                        type: string
-                      type:
-                        type: string
-                        enum:
-                          - A
-                          - AAAA
-                          - CNAME
-                          - TXT
-                          - MX
-                          - SRV
-                      ttl:
-                        type: integer
-                        format: int32
-                        minimum: 1
-                      values:
-                        type: array
-                        minItems: 1
-                        items:
-                          type: string
-            status:
-              type: object
-              properties:
-                observedGeneration:
-                  type: integer
-                  format: int64
-                conditions:
-                  type: array
-                  x-kubernetes-list-type: map
-                  x-kubernetes-list-map-keys:
-                    - type
-                  items:
-                    type: object
-                    required:
-                      - type
-                      - status
-                    properties:
-                      type:
-                        type: string
-                      status:
-                        type: string
-                      observedGeneration:
-                        type: integer
-                        format: int64
-                      lastTransitionTime:
-                        type: string
-                        format: date-time
-                      reason:
-                        type: string
-                      message:
-                        type: string
-                records:
-                  type: integer
-                serial:
-                  type: string
-                zoneFileKey:
-                  type: string
-                lastAppliedHash:
-                  type: string
+                      minItems: 1
+                      type: array
+                  required:
+                  - name
+                  - type
+                  - values
+                  type: object
+                type: array
+              ttl:
+                description: |-
+                  TTL is the default record TTL for the zone, in seconds. Defaults to 300
+                  when unset.
+                format: int32
+                maximum: 2147483647
+                minimum: 1
+                type: integer
+              unresolvedRecordPolicy:
+                description: |-
+                  UnresolvedRecordPolicy selects how CoreDNS answers undeclared names in
+                  the zone. Defaults to NXDOMAIN when unset.
+                enum:
+                - Forward
+                - NXDOMAIN
+                type: string
+              zone:
+                description: |-
+                  Zone is the DNS suffix this resource owns, such as "platform.internal".
+                  A trailing dot is optional.
+                maxLength: 253
+                minLength: 1
+                type: string
+            required:
+            - zone
+            type: object
+          status:
+            description: PrivateDNSZoneStatus reports the observed state of a private
+              DNS zone.
+            properties:
+              conditions:
+                description: Conditions report progress through render, patch, mount,
+                  and reload.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              lastAppliedHash:
+                description: |-
+                  LastAppliedHash is a digest of the rendered zone output, used to decide
+                  whether a CoreDNS restart is required.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the zone generation these conditions
+                  describe.
+                format: int64
+                type: integer
+              records:
+                description: Records is the number of rendered record values in the
+                  zone.
+                type: integer
+              serial:
+                description: Serial is the SOA serial of the most recently rendered
+                  zone file.
+                type: string
+              zoneFileKey:
+                description: |-
+                  ZoneFileKey is the CoreDNS ConfigMap key holding the rendered zone file.
+                  Only set for the NXDOMAIN policy.
+                type: string
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
