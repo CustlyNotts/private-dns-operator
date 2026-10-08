@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/CustlyNotts/private-dns-operator/security/advisories/new
+    about: Report security issues privately, never as a public issue.
+  - name: Question or discussion
+    url: https://github.com/CustlyNotts/private-dns-operator/discussions
+    about: Ask how to use the operator, or discuss an idea before filing a request.
