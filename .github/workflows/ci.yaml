@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same ref makes the in-flight run redundant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Test
@@ -23,11 +28,72 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Check formatting
+        run: make fmt-check
+
+      - name: Vet
+        run: make vet
+
       - name: Test
-        run: make test
+        run: make test-cover
 
       - name: Build
         run: make build
+
+      - name: Upload coverage profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: cover.out
+          retention-days: 7
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Lint
+        run: make lint
+
+  codegen:
+    name: Generated files are current
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Deepcopy functions, the CRDs, and the chart's copy of the CRDs are all
+      # generated. This fails the build if any of them was hand-edited or a
+      # regeneration was forgotten.
+      - name: Verify code generation
+        run: make verify-codegen
+
+  manifests:
+    name: Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -37,3 +103,72 @@ jobs:
 
       - name: Render Helm chart
         run: make helm-template
+
+      - name: Render chart with metrics and ServiceMonitor enabled
+        run: |
+          helm template private-dns-operator charts/private-dns-operator \
+            --namespace private-dns-system \
+            --set metrics.service.enabled=true \
+            --set metrics.serviceMonitor.enabled=true > /dev/null
+
+      - name: Render install manifest
+        run: make manifest-build
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+
+      # Catches a manifest that renders but would be rejected by the API server.
+      # The sample custom resources are validated against the generated CRD
+      # schemas by a Go test instead, under `make test`.
+      - name: Validate the install manifest
+        run: kubeconform -strict -summary -schema-location default dist/install.yaml
+
+
+  image:
+    name: Image builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build both release platforms without pushing, so a cross-compilation
+      # break is caught on the pull request rather than at tag time.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A successful multi-platform build does not prove cross-compilation
+      # happened: giving BuildKit's TARGETARCH a default in the Dockerfile
+      # suppresses the injected value and silently pins every platform to one
+      # architecture, producing an arm64 image containing an x86-64 binary.
+      # Assert the ELF machine type of the binary actually inside each image.
+      - name: Verify each platform holds a binary for its own architecture
+        run: |
+          set -euo pipefail
+          declare -A expected=( [amd64]="x86-64" [arm64]="ARM aarch64" )
+          for arch in amd64 arm64; do
+            docker buildx build --platform "linux/$arch" -t "pdo-verify:$arch" --load .
+            docker create --name "verify-$arch" "pdo-verify:$arch" >/dev/null
+            docker cp "verify-$arch:/manager" "manager-$arch" >/dev/null
+            docker rm "verify-$arch" >/dev/null
+            described=$(file -b "manager-$arch")
+            echo "$arch -> $described"
+            case "$described" in
+              *"${expected[$arch]}"*) ;;
+              *) echo "::error::linux/$arch image contains the wrong architecture: $described"; exit 1 ;;
+            esac
+            case "$described" in
+              *"statically linked"*) ;;
+              *) echo "::error::linux/$arch binary is not static, but the base image is distroless/static"; exit 1 ;;
+            esac
+          done

@@ -1,8 +1,14 @@
+# Build output
 bin/
 dist/
+cover.out
 *.test
 
-.DS_Store
+# Local caches
 .cache/
 
+# OS noise
+.DS_Store
+
+# Local drafts
 docs/medium-article.md
