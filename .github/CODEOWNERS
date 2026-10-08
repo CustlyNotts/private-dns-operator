@@ -1,0 +1,12 @@
+# Default owner for everything in the repository.
+*                       @CustlyNotts
+
+# Generated files. Regenerate with `make generate manifests sync-crds`
+# rather than editing them by hand.
+/api/v1alpha1/zz_generated.deepcopy.go      @CustlyNotts
+/config/crd/bases/                          @CustlyNotts
+/charts/private-dns-operator/crds/          @CustlyNotts
+
+# Release and supply-chain surface.
+/.github/workflows/                         @CustlyNotts
+/SECURITY.md                                @CustlyNotts

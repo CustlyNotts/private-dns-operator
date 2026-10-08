@@ -1,0 +1,106 @@
+name: Bug report
+description: Something in the operator does not behave as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a report. If this is a security issue, please do not
+        file it here — follow [SECURITY.md](https://github.com/CustlyNotts/private-dns-operator/blob/main/SECURITY.md)
+        instead.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did the operator do, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include the `PrivateDNSZone` and `PrivateDNSRecord` manifests you applied.
+      render: yaml
+    validations:
+      required: true
+
+  - type: textarea
+    id: corefile
+    attributes:
+      label: Resulting Corefile
+      description: |
+        Output of `kubectl -n kube-system get configmap coredns -o jsonpath='{.data.Corefile}'`.
+        Redact anything sensitive.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: zone-status
+    attributes:
+      label: Zone status
+      description: Output of `kubectl get privatednszone <name> -o yaml`, at least the `status` block.
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Operator logs
+      description: Output of `kubectl -n <release-namespace> logs deploy/private-dns-operator`.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: operator-version
+    attributes:
+      label: Operator version
+      placeholder: v1.0.1
+    validations:
+      required: true
+
+  - type: input
+    id: k8s-version
+    attributes:
+      label: Kubernetes version
+      description: Output of `kubectl version --short`.
+      placeholder: v1.31.2
+    validations:
+      required: true
+
+  - type: input
+    id: coredns-version
+    attributes:
+      label: CoreDNS version
+      placeholder: 1.11.3
+    validations:
+      required: false
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Install method
+      options:
+        - Helm chart from GHCR
+        - Helm chart from source
+        - kubectl apply of install.yaml
+        - kubectl apply -k config/default
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: policy
+    attributes:
+      label: unresolvedRecordPolicy in use
+      options:
+        - Forward
+        - NXDOMAIN
+        - both
+        - not sure
+    validations:
+      required: false

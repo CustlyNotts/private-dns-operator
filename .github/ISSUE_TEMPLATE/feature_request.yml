@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a new capability or a change to existing behaviour
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that the operator does not support today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        If this involves an API change, sketch the `PrivateDNSZone` or
+        `PrivateDNSRecord` spec you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Including workarounds you are using now.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This does not require the operator to write outside its managed Corefile block or managed ConfigMap keys.
+        - label: I have checked the Known Limitations section of the README.
