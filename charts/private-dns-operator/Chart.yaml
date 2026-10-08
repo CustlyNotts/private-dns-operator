@@ -2,11 +2,14 @@ apiVersion: v2
 name: private-dns-operator
 description: Kubernetes-native private DNS zone management for CoreDNS.
 type: application
+# Chart version and appVersion are set by the release workflow from the git tag:
+# tag vX.Y.Z yields chart version X.Y.Z and appVersion vX.Y.Z.
 version: 1.0.1
 appVersion: v1.0.1
 home: https://github.com/CustlyNotts/private-dns-operator
 sources:
   - https://github.com/CustlyNotts/private-dns-operator
+kubeVersion: ">=1.27.0-0"
 keywords:
   - kubernetes
   - coredns
@@ -16,3 +19,25 @@ keywords:
   - platform-engineering
 maintainers:
   - name: CustlyNotts
+    email: kehinde.aturuka@linux.com
+    url: https://github.com/CustlyNotts
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/operator: "true"
+  artifacthub.io/operatorCapabilities: Basic Install
+  artifacthub.io/crds: |
+    - kind: PrivateDNSZone
+      version: v1alpha1
+      name: privatednszones.dns.custlynotts.io
+      displayName: Private DNS Zone
+      description: A private DNS zone rendered into the CoreDNS Corefile.
+    - kind: PrivateDNSRecord
+      version: v1alpha1
+      name: privatednsrecords.dns.custlynotts.io
+      displayName: Private DNS Record
+      description: A namespaced record published into a PrivateDNSZone.
+  artifacthub.io/links: |
+    - name: Source
+      url: https://github.com/CustlyNotts/private-dns-operator
+    - name: Security policy
+      url: https://github.com/CustlyNotts/private-dns-operator/blob/main/SECURITY.md

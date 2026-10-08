@@ -1,12 +1,61 @@
-private-dns-operator has been installed.
+private-dns-operator {{ .Chart.AppVersion }} is installed as {{ include "private-dns-operator.fullname" . }}.
 
 CoreDNS target:
   Namespace:  {{ .Values.coredns.namespace }}
   ConfigMap:  {{ .Values.coredns.configMap }}
   Deployment: {{ .Values.coredns.deployment }}
 
-Check the operator:
-  kubectl -n {{ .Release.Namespace }} get deploy {{ include "private-dns-operator.fullname" . }}
+1. Check the operator is running:
 
-Try the samples from the repository:
-  kubectl apply -f config/samples/
+   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "private-dns-operator.fullname" . }}
+
+2. Create a zone and a record:
+
+   cat <<'EOF' | kubectl apply -f -
+   apiVersion: dns.custlynotts.io/v1alpha1
+   kind: PrivateDNSZone
+   metadata:
+     name: platform
+   spec:
+     zone: platform.internal
+     ttl: 300
+     unresolvedRecordPolicy: Forward
+   ---
+   apiVersion: dns.custlynotts.io/v1alpha1
+   kind: PrivateDNSRecord
+   metadata:
+     name: platform-api
+     namespace: {{ .Release.Namespace }}
+   spec:
+     zoneRef:
+       name: platform
+     name: api
+     type: A
+     values:
+       - 10.0.0.10
+   EOF
+
+3. Confirm the zone is ready and the record was accepted:
+
+   kubectl get privatednszones
+   kubectl get privatednsrecords -A
+
+4. Inspect what was written to CoreDNS:
+
+   kubectl -n {{ .Values.coredns.namespace }} get configmap {{ .Values.coredns.configMap }} \
+     -o jsonpath='{.data.Corefile}'
+
+The operator only writes between the "# BEGIN private-dns-zone-operator" and
+"# END private-dns-zone-operator" markers. Everything else in the Corefile is
+left untouched.
+
+{{- if .Values.metrics.service.enabled }}
+
+WARNING: metrics.service.enabled is set. The metrics endpoint is served without
+authentication, so restrict access to port {{ .Values.metrics.service.port }} with a NetworkPolicy.
+{{- end }}
+{{- if not .Values.leaderElection.enabled }}
+
+WARNING: leader election is disabled. Running more than one replica will let
+several managers write the CoreDNS ConfigMap at once.
+{{- end }}
