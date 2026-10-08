@@ -1,112 +1,197 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
   name: privatednsrecords.dns.custlynotts.io
 spec:
   group: dns.custlynotts.io
-  scope: Namespaced
   names:
-    plural: privatednsrecords
-    singular: privatednsrecord
     kind: PrivateDNSRecord
+    listKind: PrivateDNSRecordList
+    plural: privatednsrecords
     shortNames:
-      - pdr
+    - pdr
+    singular: privatednsrecord
+  scope: Namespaced
   versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Zone
-          type: string
-          jsonPath: .spec.zoneRef.name
-        - name: Name
-          type: string
-          jsonPath: .spec.name
-        - name: Type
-          type: string
-          jsonPath: .spec.type
-        - name: FQDN
-          type: string
-          jsonPath: .status.fqdn
-      schema:
-        openAPIV3Schema:
-          type: object
-          required:
-            - spec
-          properties:
-            apiVersion:
-              type: string
-            kind:
-              type: string
-            metadata:
-              type: object
-            spec:
-              type: object
-              required:
-                - zoneRef
-                - name
-                - type
-                - values
-              properties:
-                zoneRef:
-                  type: object
-                  required:
-                    - name
-                  properties:
-                    name:
-                      type: string
-                name:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.zoneRef.name
+      name: Zone
+      type: string
+    - jsonPath: .spec.name
+      name: Name
+      type: string
+    - jsonPath: .spec.type
+      name: Type
+      type: string
+    - jsonPath: .status.fqdn
+      name: FQDN
+      type: string
+    - jsonPath: .status.conditions[?(@.type=="Accepted")].status
+      name: Accepted
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PrivateDNSRecord is a namespaced record published into a PrivateDNSZone.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: PrivateDNSRecordSpec defines a single delegated record in
+              a private zone.
+            properties:
+              name:
+                description: |-
+                  Name is the record name relative to the zone. Use "@" or an empty string
+                  for the zone apex, or a fully qualified name ending in a dot that falls
+                  inside the zone.
+                maxLength: 253
+                type: string
+              ttl:
+                description: TTL overrides the zone TTL for this record, in seconds.
+                format: int32
+                maximum: 2147483647
+                minimum: 1
+                type: integer
+              type:
+                description: Type is the DNS record type.
+                enum:
+                - A
+                - AAAA
+                - CNAME
+                - TXT
+                - MX
+                - SRV
+                type: string
+              values:
+                description: |-
+                  Values holds the record data. The accepted format depends on Type:
+                  an IPv4 address for A, an IPv6 address for AAAA, a hostname for CNAME,
+                  free text for TXT, "<priority> <host>" for MX, and
+                  "<priority> <weight> <port> <target>" for SRV.
+                items:
                   type: string
-                type:
-                  type: string
-                  enum:
-                    - A
-                    - AAAA
-                    - CNAME
-                    - TXT
-                    - MX
-                    - SRV
-                ttl:
-                  type: integer
-                  format: int32
-                  minimum: 1
-                values:
-                  type: array
-                  minItems: 1
-                  items:
+                minItems: 1
+                type: array
+              zoneRef:
+                description: |-
+                  ZoneRef selects the PrivateDNSZone this record belongs to. The zone's
+                  allowedNamespaces must permit this record's namespace.
+                properties:
+                  name:
+                    description: Name is the name of the PrivateDNSZone object.
+                    minLength: 1
                     type: string
-            status:
-              type: object
-              properties:
-                observedGeneration:
-                  type: integer
-                  format: int64
-                fqdn:
-                  type: string
-                conditions:
-                  type: array
-                  x-kubernetes-list-type: map
-                  x-kubernetes-list-map-keys:
-                    - type
-                  items:
-                    type: object
-                    required:
-                      - type
-                      - status
-                    properties:
-                      type:
-                        type: string
-                      status:
-                        type: string
-                      observedGeneration:
-                        type: integer
-                        format: int64
-                      lastTransitionTime:
-                        type: string
-                        format: date-time
-                      reason:
-                        type: string
-                      message:
-                        type: string
+                required:
+                - name
+                type: object
+            required:
+            - name
+            - type
+            - values
+            - zoneRef
+            type: object
+          status:
+            description: PrivateDNSRecordStatus reports whether a record was accepted
+              into its zone.
+            properties:
+              conditions:
+                description: Conditions report whether the record was accepted and
+                  published.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              fqdn:
+                description: |-
+                  FQDN is the fully qualified name this record resolves, as rendered into
+                  CoreDNS.
+                type: string
+              observedGeneration:
+                description: ObservedGeneration is the record generation these conditions
+                  describe.
+                format: int64
+                type: integer
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
