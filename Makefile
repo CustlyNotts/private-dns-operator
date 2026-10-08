@@ -6,7 +6,7 @@ KUSTOMIZE_VERSION        ?= v5.8.1
 
 # ---- Release coordinates ------------------------------------------------
 # A git tag vX.Y.Z yields image tag vX.Y.Z and chart version X.Y.Z.
-VERSION          ?= v1.0.1
+VERSION          ?= v1.1.0
 HELM_VERSION     ?= $(patsubst v%,%,$(VERSION))
 HELM_APP_VERSION ?= $(VERSION)
 IMAGE_REPO       ?= ghcr.io/custlynotts/private-dns-operator

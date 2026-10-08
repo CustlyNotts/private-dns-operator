@@ -59,7 +59,7 @@ The operator treats Kubernetes CRs as the source of truth. It rebuilds managed D
 ```bash
 helm upgrade --install private-dns-operator \
   oci://ghcr.io/custlynotts/charts/private-dns-operator \
-  --version 1.0.1 \
+  --version 1.1.0 \
   --namespace private-dns-operator-system \
   --create-namespace
 ```
@@ -384,7 +384,7 @@ The GitHub release tag, image tag, chart `appVersion`, and chart package version
 
 ```text
 ghcr.io/custlynotts/private-dns-operator:v1.0.1
-oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.0.1
+oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.1.0
 ```
 
 Images carry SBOMs and build provenance. Verify a published image with:

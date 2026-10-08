@@ -4,8 +4,8 @@ description: Kubernetes-native private DNS zone management for CoreDNS.
 type: application
 # Chart version and appVersion are set by the release workflow from the git tag:
 # tag vX.Y.Z yields chart version X.Y.Z and appVersion vX.Y.Z.
-version: 1.0.1
-appVersion: v1.0.1
+version: 1.1.0
+appVersion: v1.1.0
 home: https://github.com/CustlyNotts/private-dns-operator
 sources:
   - https://github.com/CustlyNotts/private-dns-operator
