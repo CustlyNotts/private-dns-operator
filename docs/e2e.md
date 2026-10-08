@@ -25,6 +25,12 @@ The smoke test checks that:
 ./e2e/smoke-test.sh
 ```
 
+Each DNS assertion polls rather than sampling once. A zone reporting `Ready` only
+means the operator has written the CoreDNS ConfigMap; the kubelet then has to
+re-project the volume and CoreDNS has to reload, which is routinely 45 to 90
+seconds. Tune the patience with `DNS_TIMEOUT` (default 180 seconds) and
+`DNS_POLL_INTERVAL` (default 10).
+
 Override defaults when needed:
 
 ```bash
