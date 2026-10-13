@@ -12,10 +12,11 @@ reference and DNS semantics.
 ```bash
 helm upgrade --install private-dns-operator \
   oci://ghcr.io/custlynotts/charts/private-dns-operator \
-  --version 1.1.0 \
   --namespace private-dns-operator-system \
   --create-namespace
 ```
+
+That installs the newest release. Add `--version 1.1.0` to pin a specific one.
 
 The chart installs its CRDs from `crds/`. Helm does not upgrade or delete CRDs
 on `helm upgrade` or `helm uninstall`, so apply CRD changes yourself when a

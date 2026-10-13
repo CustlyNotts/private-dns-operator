@@ -118,8 +118,12 @@ verify-codegen: ## Fail if generated files are out of date
 
 ##@ Verification
 
+.PHONY: verify-version
+verify-version: ## Fail if any doc or manifest names a version other than VERSION
+	@hack/set-version.sh --check $(VERSION)
+
 .PHONY: verify
-verify: fmt-check vet lint test build verify-codegen helm-lint helm-template manifest-build ## Everything CI runs
+verify: fmt-check vet lint test build verify-codegen verify-version helm-lint helm-template manifest-build ## Everything CI runs
 
 ##@ Manifests
 
