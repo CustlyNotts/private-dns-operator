@@ -173,5 +173,5 @@ type PrivateDNSZoneList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&PrivateDNSZone{}, &PrivateDNSZoneList{})
+	SchemeBuilder.Register(registerTypes(&PrivateDNSZone{}, &PrivateDNSZoneList{}))
 }
