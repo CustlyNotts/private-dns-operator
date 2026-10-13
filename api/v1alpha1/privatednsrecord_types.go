@@ -101,5 +101,5 @@ type PrivateDNSRecordList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&PrivateDNSRecord{}, &PrivateDNSRecordList{})
+	SchemeBuilder.Register(registerTypes(&PrivateDNSRecord{}, &PrivateDNSRecordList{}))
 }

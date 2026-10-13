@@ -21,17 +21,41 @@ limitations under the License.
 package v1alpha1
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
 var (
 	// GroupVersion is the group version used to register these objects.
 	GroupVersion = schema.GroupVersion{Group: "dns.custlynotts.io", Version: "v1alpha1"}
 
-	// SchemeBuilder registers the Go types with a runtime scheme.
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	// SchemeBuilder collects the functions that register this group version's
+	// types with a scheme. Each types file adds its own through init.
+	//
+	// This is apimachinery's builder rather than controller-runtime's, which is
+	// deprecated for exactly the reason it names: an API package should be cheap
+	// to import, and depending on controller-runtime here drags its whole
+	// dependency tree into anyone who only wants the types.
+	SchemeBuilder = runtime.NewSchemeBuilder(addGroupVersion)
 
 	// AddToScheme adds the types in this group version to a scheme.
 	AddToScheme = SchemeBuilder.AddToScheme
 )
+
+// addGroupVersion registers the group version itself, which the serialization
+// machinery needs alongside the types. controller-runtime's builder did this
+// implicitly.
+func addGroupVersion(scheme *runtime.Scheme) error {
+	metav1.AddToGroupVersion(scheme, GroupVersion)
+	return nil
+}
+
+// registerTypes returns a scheme function adding objects under GroupVersion, so
+// each types file keeps registering itself instead of having to be listed here.
+func registerTypes(objects ...runtime.Object) func(*runtime.Scheme) error {
+	return func(scheme *runtime.Scheme) error {
+		scheme.AddKnownTypes(GroupVersion, objects...)
+		return nil
+	}
+}
