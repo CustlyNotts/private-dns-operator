@@ -56,6 +56,7 @@ const (
 	reasonNamespaceNotAllowed = "NamespaceNotAllowed"
 	reasonInvalidRecord       = "InvalidRecord"
 	reasonCoreDNSUnavailable  = "CoreDNSUnavailable"
+	reasonConflictingRecords  = "ConflictingRecords"
 )
 
 // PrivateDNSZoneReconciler renders every PrivateDNSZone and PrivateDNSRecord in
@@ -82,6 +83,11 @@ type zoneResult struct {
 	zoneFileKey     string
 	lastAppliedHash string
 	rendered        bool
+
+	// excluded lists names withheld because the records at them conflict. The
+	// zone still publishes everything else, so this is reported as its own
+	// condition rather than by failing the zone.
+	excluded []string
 }
 
 // recordOutcome is the per-record outcome of a reconcile.
@@ -174,7 +180,7 @@ func (r *PrivateDNSZoneReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			continue
 		}
 
-		compiled, validationErrs := r.recordsForZone(*zone, normalizedZone, records.Items, outcomes)
+		compiled, excluded, validationErrs := r.recordsForZone(*zone, normalizedZone, records.Items, outcomes)
 		if len(validationErrs) > 0 {
 			result := failedResult(zone.Generation, reasonInvalidRecordSet, validationErrs[0].Error())
 			r.holdLastKnownGood(zone, normalizedZone, previousBlocks, previousManagedKeys, &cm, &result, &directives, zoneFiles)
@@ -209,6 +215,7 @@ func (r *PrivateDNSZoneReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			serial:          zoneFile.Serial,
 			lastAppliedHash: zoneFile.Hash,
 			rendered:        true,
+			excluded:        excluded,
 		}
 		if policy == dnsv1alpha1.UnresolvedRecordPolicyForward {
 			result.conditions = append(result.conditions,
@@ -469,6 +476,16 @@ func (r *PrivateDNSZoneReconciler) writeZoneStatuses(
 		}
 
 		desired := append([]metav1.Condition(nil), result.conditions...)
+		if result.rendered && len(result.excluded) > 0 {
+			// The zone is serving, but a name in it is deliberately dark. Say so
+			// here: the zone owner does not necessarily watch every delegated
+			// record, and silently dropping a name would be harder to debug than
+			// the zone-wide failure this replaced.
+			desired = append(desired,
+				condition(ConditionRecordsExcluded, metav1.ConditionTrue, reasonConflictingRecords,
+					fmt.Sprintf("withheld %d name(s) whose records conflict: %s",
+						len(result.excluded), strings.Join(result.excluded, ", ")), zone.Generation))
+		}
 		if result.rendered {
 			desired = append(desired,
 				condition(ConditionCorefilePatched, metav1.ConditionTrue, "Patched",
@@ -567,7 +584,7 @@ func (r *PrivateDNSZoneReconciler) recordsForZone(
 	normalizedZone string,
 	external []dnsv1alpha1.PrivateDNSRecord,
 	outcomes map[string]recordOutcome,
-) ([]dnsrender.Record, []error) {
+) ([]dnsrender.Record, []string, []error) {
 	var admitted []dnsrender.Record
 	var blocking []error
 
@@ -640,22 +657,56 @@ func (r *PrivateDNSZoneReconciler) recordsForZone(
 		}
 	}
 
-	setErrs := dnsrender.ValidateRecordSet(admitted)
-	for _, err := range setErrs {
+	// A conflict between records is scoped to the name it affects rather than
+	// the whole zone. Publishing either side of an ambiguous name would be an
+	// arbitrary choice, so the entire RRset is withheld and every other name in
+	// the zone still resolves.
+	//
+	// The exception is a conflict the zone's own spec takes part in. An inline
+	// record is the zone author's declaration, so that makes the zone's desired
+	// state invalid and blocks it, exactly as an invalid inline record does.
+	conflicts := map[string]string{}
+	for _, err := range dnsrender.ValidateRecordSet(admitted) {
 		var validationErr dnsrender.ValidationError
-		if !errors.As(err, &validationErr) || validationErr.Source.Kind != "PrivateDNSRecord" {
+		if errors.As(err, &validationErr) {
+			conflicts[validationErr.FQDN] = validationErr.Message
 			continue
 		}
-		key := recordKey(validationErr.Source.Namespace, validationErr.Source.Name)
-		outcome := outcomes[key]
-		outcome.accepted = false
-		outcome.reason = reasonInvalidRecord
-		outcome.message = validationErr.Message
-		outcomes[key] = outcome
+		blocking = append(blocking, err)
 	}
-	blocking = append(blocking, setErrs...)
+	if len(conflicts) == 0 {
+		return admitted, nil, blocking
+	}
 
-	return admitted, blocking
+	var kept []dnsrender.Record
+	excluded := map[string]struct{}{}
+	for _, record := range admitted {
+		message, conflicted := conflicts[record.FQDN]
+		if !conflicted {
+			kept = append(kept, record)
+			continue
+		}
+		excluded[strings.TrimSuffix(record.FQDN, ".")] = struct{}{}
+
+		if record.Source.Kind == "PrivateDNSZone" {
+			blocking = append(blocking, dnsrender.ValidationError{
+				Source: record.Source, FQDN: record.FQDN, Message: message,
+			})
+			continue
+		}
+		outcomes[recordKey(record.Source.Namespace, record.Source.Name)] = recordOutcome{
+			reason:  reasonConflictingRecords,
+			message: fmt.Sprintf("%s; no record at this name is published", message),
+		}
+	}
+
+	names := make([]string, 0, len(excluded))
+	for name := range excluded {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	return kept, names, blocking
 }
 
 // validationMessage unwraps the human-readable half of a record validation

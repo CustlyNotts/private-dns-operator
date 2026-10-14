@@ -4,6 +4,34 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- A conflict between records now costs only the name it affects, not the whole
+  zone. A `CNAME` sharing a name with another type, or resolving to more than one
+  target, previously made the zone's desired state invalid: the zone went
+  `Ready=False` and held its last known good output, so every other name in it
+  stopped receiving updates. Two tenants that both had permission to publish
+  could therefore take the zone down by disagreeing about a single name.
+
+  The whole RRset at the ambiguous name is now withheld, since publishing either
+  side would be an arbitrary choice, and the rest of the zone keeps resolving.
+  Every record involved reports `ConflictingRecords` on its own status, so both
+  sides see the problem rather than whichever one sorted first.
+
+  A conflict that one of the zone's **own inline records** takes part in still
+  blocks the zone. An inline record is the zone author's declaration, so that is
+  the zone's desired state being invalid rather than one name being ambiguous,
+  which keeps the boundary consistent with how an invalid inline record behaves.
+
+### Added
+
+- `RecordsExcluded` condition on `PrivateDNSZone`, set when the zone is serving
+  but a name has been withheld, with the withheld names in its message. Without
+  it, scoping the failure would have traded a loud zone-wide error for a name
+  silently disappearing, which is harder to debug.
+
 ## v1.1.0 - 2026-10-08
 
 First open-source release. The behaviour changes below are backward-compatible

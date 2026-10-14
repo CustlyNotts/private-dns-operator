@@ -27,7 +27,7 @@ Manual CoreDNS edits are fragile, difficult to delegate, and easy to forget duri
 - `PrivateDNSRecord` namespaced API for delegated record ownership
 - supported record types: `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `SRV`
 - compatible duplicate records are allowed, such as multiple `A` records for one FQDN
-- `CNAME` conflicts are rejected during reconcile
+- `CNAME` conflicts are rejected, scoped to the affected name rather than the whole zone
 - deterministic full-zone rendering prevents stale record drift
 - `Forward` mode supports partial private overrides using CoreDNS `template` + `fallthrough`
 - `NXDOMAIN` mode supports strict authoritative private zones using CoreDNS `file`
@@ -201,6 +201,8 @@ Records that share a name and type are merged into one RRset, so it does not mat
 
 A `CNAME` is the one exception, because DNS requires it to be the only data at its name. The operator rejects a `CNAME` that shares a name with any other record type, and one that resolves to more than one distinct target. Several records naming the *same* target are a compatible duplicate and are accepted, with case and trailing dots normalised before they are compared.
 
+A rejection is scoped to the name it affects. The whole RRset at that name is withheld, since publishing either side of an ambiguous name would be an arbitrary choice, and every record involved reports `ConflictingRecords` on its own status. The rest of the zone carries on resolving. The exception is a conflict that one of the zone's own inline records takes part in: that makes the zone's desired state invalid, so the zone holds its last known good output instead.
+
 ## Unresolved Record Policy
 
 `unresolvedRecordPolicy` controls how the operator renders the dedicated CoreDNS server block for a private zone. It defaults to `NXDOMAIN`.
@@ -254,10 +256,13 @@ rancher.io:53 {
 | `VolumeMounted` | CoreDNS Deployment volume items are current |
 | `ReloadTriggered` | CoreDNS reload or rollout restart was triggered |
 | `LastKnownGoodApplied` | the desired state is invalid, so the previous output is being held |
+| `RecordsExcluded` | the zone is serving, but a name was withheld because the records at it conflict |
 | `Ready` | the zone is ready, or blocked with a reason |
 
 `Ready=False` reasons are `InvalidZone`, `InvalidRecordSet`, `ZoneRenderFailed`, and
 `CoreDNSUnavailable` when the configured CoreDNS ConfigMap cannot be read.
+
+A zone can be `Ready=True` and still carry `RecordsExcluded`. That combination means the zone is published and every other name resolves, but one name is deliberately dark because the records at it disagree. The condition message names them.
 
 ```bash
 kubectl get privatednszones
@@ -275,6 +280,7 @@ Each `PrivateDNSRecord` reports its own fate through an `Accepted` condition and
 | `ZoneNotFound` | no `PrivateDNSZone` with that `zoneRef.name` is available |
 | `NamespaceNotAllowed` | the zone's `allowedNamespaces` does not list this namespace |
 | `InvalidRecord` | the record's name or values were rejected |
+| `ConflictingRecords` | another record at the same name disagrees, so neither is published |
 | `ZoneNotReady` | the zone itself is blocked, so nothing from it is being published |
 
 ```bash
@@ -289,6 +295,7 @@ kubectl get privatednsrecords -A
 - Generated ConfigMap keys are tracked in the `dns.custlynotts.io/managed-zone-keys` annotation. That annotation is the only authority on ownership: a zone file the operator did not create is never adopted, deleted, or unmounted, even if it is named like one.
 - CoreDNS writes are ordered so its ConfigMap mount is never broken. Because CoreDNS mounts the ConfigMap with explicit volume `items`, a key named in those items has to exist in the ConfigMap or new pods fail to mount, and a file named by the Corefile has to be mounted or CoreDNS exits at startup. Creating a zone needs the ConfigMap written first and retiring one needs the Deployment written first, so the operator expands before it switches and contracts afterwards: add the zone files, mount the union of the old and new keys, switch the Corefile, unmount the retired keys, then delete them. Both conditions hold after every individual write, so a reconcile interrupted at any point leaves CoreDNS servable. A steady-state reconcile writes nothing.
 - Zones are isolated. An invalid zone is reported on its own status and skipped; every other zone is still rendered and patched into CoreDNS.
+- Failures are scoped as narrowly as the ambiguity allows. A record barred by `allowedNamespaces` or individually malformed is excluded alone; records that conflict with each other cost only the name they share; only the zone's own spec being invalid costs the zone.
 - A zone whose desired state stops being valid keeps its last rendered output, both the Corefile stanza and the zone file, rather than vanishing from DNS. This is reported as `LastKnownGoodApplied`. A zone that has never rendered successfully has nothing to hold and is simply absent.
 - `PrivateDNSZone` uses a finalizer for zone cleanup.
 - `PrivateDNSRecord` deletion is handled by deterministic full-state rendering from remaining CRs.
@@ -400,6 +407,7 @@ gh attestation verify oci://ghcr.io/custlynotts/private-dns-operator:v1.1.0 \
 - A zone reaching `Ready` means the operator has written the CoreDNS ConfigMap, not that DNS has changed. The kubelet still has to re-project the ConfigMap volume and CoreDNS still has to reload, which together is routinely 45 to 90 seconds. Automation that asserts on DNS results has to poll rather than sample once.
 - The rendered server block uses a fixed `cache 30`, which caps the effective TTL of every answer at 30 seconds regardless of the TTL declared on the zone or record.
 - Admission webhooks are not included yet. CRD schema validation covers field shapes; cross-record rules such as `CNAME` conflicts are still evaluated during reconcile and surface on status rather than being rejected at admission.
+- A conflict costs the name it affects. If two tenants that are both permitted to publish into a zone disagree about one name, that name stops resolving for everyone until they agree.
 - Autodiscovery of CoreDNS resources is intentionally not enabled. CoreDNS targets are explicit for safety.
 - A single `PrivateDNSZone` per DNS suffix is assumed. Two zones declaring the same suffix will contend for the same rendered stanza.
 - The metrics endpoint is unauthenticated, so the chart does not create a Service for it by default.

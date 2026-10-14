@@ -308,12 +308,14 @@ func TestReconcileInvalidZoneDoesNotBlockHealthyZones(t *testing.T) {
 // TestReconcileInvalidRecordSetDoesNotBlockHealthyZones covers the same
 // isolation for the more common failure: a valid zone whose records conflict.
 func TestReconcileInvalidRecordSetDoesNotBlockHealthyZones(t *testing.T) {
+	broken := zone("conflicted", "conflicted.internal", dnsv1alpha1.UnresolvedRecordPolicyForward)
+	broken.Spec.Records = []dnsv1alpha1.PrivateDNSRecordSpecInline{{
+		Name: "api", Type: dnsv1alpha1.DNSRecordTypeA, Values: []string{"not-an-ip"},
+	}}
 	r, c := newReconciler(t,
 		zone("healthy", "healthy.internal", dnsv1alpha1.UnresolvedRecordPolicyForward),
-		zone("conflicted", "conflicted.internal", dnsv1alpha1.UnresolvedRecordPolicyForward),
+		broken,
 		record("healthy-api", "default", "healthy", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
-		record("conflict-a", "default", "conflicted", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
-		record("conflict-cname", "default", "conflicted", "api", dnsv1alpha1.DNSRecordTypeCNAME, "elsewhere.example.com"),
 		corednsConfigMap(map[string]string{"Corefile": baseCorefile}, ""),
 		corednsDeployment(),
 	)
@@ -327,24 +329,27 @@ func TestReconcileInvalidRecordSetDoesNotBlockHealthyZones(t *testing.T) {
 }
 
 func TestReconcileHoldsLastKnownGoodOutput(t *testing.T) {
-	objects := []client.Object{
+	r, c := newReconciler(t,
 		zone("alpha", "alpha.internal", dnsv1alpha1.UnresolvedRecordPolicyNXDOMAIN),
 		record("alpha-api", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
 		corednsConfigMap(map[string]string{"Corefile": baseCorefile}, ""),
 		corednsDeployment(),
-	}
-	r, c := newReconciler(t, objects...)
+	)
 	runReconcile(t, r, "alpha")
 
-	healthyCorefile := getCorefile(t, c)
 	zoneFileKey := getZone(t, c, "alpha").Status.ZoneFileKey
-	if !strings.Contains(healthyCorefile, "alpha.internal:53 {") {
-		t.Fatalf("setup did not render the zone:\n%s", healthyCorefile)
+	if !strings.Contains(getCorefile(t, c), "alpha.internal:53 {") {
+		t.Fatal("setup did not render the zone")
 	}
 
-	// Introduce a CNAME that conflicts with the existing A record.
-	if err := c.Create(context.Background(), record("alpha-bad", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeCNAME, "elsewhere.example.com")); err != nil {
-		t.Fatalf("create conflicting record: %v", err)
+	// Break the zone's own spec, which is what blocks a zone now that a conflict
+	// between delegated records is scoped to the name instead.
+	z := getZone(t, c, "alpha")
+	z.Spec.Records = []dnsv1alpha1.PrivateDNSRecordSpecInline{{
+		Name: "broken", Type: dnsv1alpha1.DNSRecordTypeA, Values: []string{"not-an-ip"},
+	}}
+	if err := c.Update(context.Background(), z); err != nil {
+		t.Fatalf("break the zone spec: %v", err)
 	}
 	runReconcile(t, r, "alpha")
 
@@ -364,9 +369,9 @@ func TestReconcileHoldsLastKnownGoodOutput(t *testing.T) {
 		t.Errorf("the last known good zone file was dropped: %q", cm.Data[zoneFileKey])
 	}
 
-	z := getZone(t, c, "alpha")
-	assertCondition(t, z.Status.Conditions, ConditionReady, metav1.ConditionFalse, reasonInvalidRecordSet)
-	assertCondition(t, z.Status.Conditions, ConditionLastKnownGoodApplied, metav1.ConditionTrue, reasonInvalidRecordSet)
+	stored := getZone(t, c, "alpha")
+	assertCondition(t, stored.Status.Conditions, ConditionReady, metav1.ConditionFalse, reasonInvalidRecordSet)
+	assertCondition(t, stored.Status.Conditions, ConditionLastKnownGoodApplied, metav1.ConditionTrue, reasonInvalidRecordSet)
 }
 
 func TestReconcileDropsZoneConditionsOnRecovery(t *testing.T) {
@@ -378,23 +383,28 @@ func TestReconcileDropsZoneConditionsOnRecovery(t *testing.T) {
 	)
 	runReconcile(t, r, "alpha")
 
-	bad := record("alpha-bad", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeCNAME, "elsewhere.example.com")
-	if err := c.Create(context.Background(), bad); err != nil {
-		t.Fatalf("create conflicting record: %v", err)
+	z := getZone(t, c, "alpha")
+	z.Spec.Records = []dnsv1alpha1.PrivateDNSRecordSpecInline{{
+		Name: "broken", Type: dnsv1alpha1.DNSRecordTypeA, Values: []string{"not-an-ip"},
+	}}
+	if err := c.Update(context.Background(), z); err != nil {
+		t.Fatalf("break the zone spec: %v", err)
 	}
 	runReconcile(t, r, "alpha")
 	if apimeta.FindStatusCondition(getZone(t, c, "alpha").Status.Conditions, ConditionLastKnownGoodApplied) == nil {
 		t.Fatal("setup did not reach the held state")
 	}
 
-	if err := c.Delete(context.Background(), bad); err != nil {
-		t.Fatalf("delete conflicting record: %v", err)
+	z = getZone(t, c, "alpha")
+	z.Spec.Records = nil
+	if err := c.Update(context.Background(), z); err != nil {
+		t.Fatalf("repair the zone spec: %v", err)
 	}
 	runReconcile(t, r, "alpha")
 
-	z := getZone(t, c, "alpha")
-	assertCondition(t, z.Status.Conditions, ConditionReady, metav1.ConditionTrue, "Ready")
-	if cond := apimeta.FindStatusCondition(z.Status.Conditions, ConditionLastKnownGoodApplied); cond != nil {
+	stored := getZone(t, c, "alpha")
+	assertCondition(t, stored.Status.Conditions, ConditionReady, metav1.ConditionTrue, "Ready")
+	if cond := apimeta.FindStatusCondition(stored.Status.Conditions, ConditionLastKnownGoodApplied); cond != nil {
 		t.Errorf("LastKnownGoodApplied should be pruned once the zone recovers, got %+v", cond)
 	}
 }
@@ -834,7 +844,71 @@ func TestInvalidInlineZoneRecordBlocksTheZone(t *testing.T) {
 // set-level inconsistency still fails safe. Both records here are from permitted
 // namespaces, so this is a correctness problem between authorised publishers
 // rather than a privilege violation.
-func TestCNAMEConflictBetweenAdmittedRecordsBlocksTheZone(t *testing.T) {
+// TestConflictIsScopedToTheNameNotTheZone covers the containment of a genuine
+// record conflict. Publishing either side of an ambiguous name would be an
+// arbitrary choice, so the whole RRset is withheld, but every other name in the
+// zone keeps resolving and the zone itself stays Ready.
+func TestConflictIsScopedToTheNameNotTheZone(t *testing.T) {
+	r, c := newReconciler(t,
+		zone("alpha", "alpha.internal", dnsv1alpha1.UnresolvedRecordPolicyForward),
+		record("a-record", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
+		record("cname", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeCNAME, "elsewhere.example.com"),
+		record("unrelated", "default", "alpha", "web", dnsv1alpha1.DNSRecordTypeA, "10.0.0.9"),
+		corednsConfigMap(map[string]string{"Corefile": baseCorefile}, ""),
+		corednsDeployment(),
+	)
+	runReconcile(t, r, "alpha")
+
+	stored := getZone(t, c, "alpha")
+	assertCondition(t, stored.Status.Conditions, ConditionReady, metav1.ConditionTrue, "Ready")
+	assertCondition(t, stored.Status.Conditions, ConditionRecordsExcluded, metav1.ConditionTrue, reasonConflictingRecords)
+	if msg := apimeta.FindStatusCondition(stored.Status.Conditions, ConditionRecordsExcluded).Message; !strings.Contains(msg, "api.alpha.internal") {
+		t.Errorf("the condition should name the withheld name, got %q", msg)
+	}
+
+	corefile := getCorefile(t, c)
+	// The unrelated name is unaffected.
+	if !strings.Contains(corefile, "10.0.0.9") {
+		t.Errorf("an unrelated name in the same zone must still publish:\n%s", corefile)
+	}
+	// Neither side of the ambiguous name is served, because choosing one would
+	// be arbitrary.
+	if strings.Contains(corefile, "10.0.0.1") {
+		t.Errorf("the conflicting A record must not be published:\n%s", corefile)
+	}
+	if strings.Contains(corefile, "elsewhere.example.com") {
+		t.Errorf("the conflicting CNAME must not be published:\n%s", corefile)
+	}
+
+	// Both sides report the conflict, not just whichever sorted first.
+	for _, name := range []string{"a-record", "cname"} {
+		rec := getRecord(t, c, "default", name)
+		assertCondition(t, rec.Status.Conditions, ConditionAccepted, metav1.ConditionFalse, reasonConflictingRecords)
+	}
+	assertCondition(t, getRecord(t, c, "default", "unrelated").Status.Conditions, ConditionAccepted, metav1.ConditionTrue, reasonAccepted)
+}
+
+// TestConflictInvolvingAnInlineRecordStillBlocksTheZone draws the boundary: an
+// inline record is the zone author's own declaration, so a conflict it takes
+// part in makes the zone's desired state invalid rather than one name ambiguous.
+func TestConflictInvolvingAnInlineRecordStillBlocksTheZone(t *testing.T) {
+	z := zone("alpha", "alpha.internal", dnsv1alpha1.UnresolvedRecordPolicyForward)
+	z.Spec.Records = []dnsv1alpha1.PrivateDNSRecordSpecInline{{
+		Name: "api", Type: dnsv1alpha1.DNSRecordTypeCNAME, Values: []string{"elsewhere.example.com"},
+	}}
+	r, c := newReconciler(t, z,
+		record("tenant-a", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
+		corednsConfigMap(map[string]string{"Corefile": baseCorefile}, ""),
+		corednsDeployment(),
+	)
+	runReconcile(t, r, "alpha")
+
+	assertCondition(t, getZone(t, c, "alpha").Status.Conditions, ConditionReady, metav1.ConditionFalse, reasonInvalidRecordSet)
+}
+
+// TestRecordsExcludedIsPrunedOnRecovery confirms the new condition disappears
+// once the conflict is resolved, rather than sticking to the zone.
+func TestRecordsExcludedIsPrunedOnRecovery(t *testing.T) {
 	r, c := newReconciler(t,
 		zone("alpha", "alpha.internal", dnsv1alpha1.UnresolvedRecordPolicyForward),
 		record("a-record", "default", "alpha", "api", dnsv1alpha1.DNSRecordTypeA, "10.0.0.1"),
@@ -843,5 +917,22 @@ func TestCNAMEConflictBetweenAdmittedRecordsBlocksTheZone(t *testing.T) {
 		corednsDeployment(),
 	)
 	runReconcile(t, r, "alpha")
-	assertCondition(t, getZone(t, c, "alpha").Status.Conditions, ConditionReady, metav1.ConditionFalse, reasonInvalidRecordSet)
+	if apimeta.FindStatusCondition(getZone(t, c, "alpha").Status.Conditions, ConditionRecordsExcluded) == nil {
+		t.Fatal("setup did not reach the excluded state")
+	}
+
+	if err := c.Delete(context.Background(), getRecord(t, c, "default", "cname")); err != nil {
+		t.Fatalf("delete the conflicting record: %v", err)
+	}
+	runReconcile(t, r, "alpha")
+
+	stored := getZone(t, c, "alpha")
+	assertCondition(t, stored.Status.Conditions, ConditionReady, metav1.ConditionTrue, "Ready")
+	if cond := apimeta.FindStatusCondition(stored.Status.Conditions, ConditionRecordsExcluded); cond != nil {
+		t.Errorf("RecordsExcluded should be pruned once the conflict is gone, got %+v", cond)
+	}
+	if !strings.Contains(getCorefile(t, c), "10.0.0.1") {
+		t.Error("the surviving record should publish once the conflict is resolved")
+	}
+	assertCondition(t, getRecord(t, c, "default", "a-record").Status.Conditions, ConditionAccepted, metav1.ConditionTrue, reasonAccepted)
 }
