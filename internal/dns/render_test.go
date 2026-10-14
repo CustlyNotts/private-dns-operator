@@ -22,7 +22,7 @@ func TestRenderZone(t *testing.T) {
 	zoneFile, err := RenderZone(zone, []Record{
 		{Zone: "example.com.", Name: "api", FQDN: "api.example.com.", Type: dnsv1alpha1.DNSRecordTypeA, TTL: recordTTL, Values: []string{"10.0.0.2", "10.0.0.1"}},
 		{Zone: "example.com.", Name: "info", FQDN: "info.example.com.", Type: dnsv1alpha1.DNSRecordTypeTXT, TTL: ttl, Values: []string{"hello"}},
-	}, time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC))
+	}, time.Date(2026, 7, 3, 0, 0, 0, 0, time.UTC), PreviousRender{})
 	if err != nil {
 		t.Fatalf("render zone: %v", err)
 	}

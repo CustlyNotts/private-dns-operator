@@ -6,6 +6,30 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+### Fixed
+
+- `NXDOMAIN` zones served stale records for up to a day. The SOA serial was
+  produced with the layout `2006010201`, and Go's `01` is month rather than hour,
+  so it rendered `YYYYMMDD` followed by the month repeated and only advanced once
+  per calendar day. CoreDNS's `file` plugin reloads a zone only when its serial
+  increases, so every record change inside that window was invisible until the
+  serial rolled over or CoreDNS restarted. The zone file on disk was correct the
+  whole time, which is what made it hard to see.
+
+  The serial now advances whenever the rendered records change, keeping the
+  conventional `YYYYMMDDnn` shape and incrementing past the previous value when
+  that form would not be greater, including when a node's clock runs backwards.
+  It deliberately does *not* advance when nothing changed: the serial sits inside
+  the rendered content, so one that moved every pass would change the content
+  hash, write status, and retrigger the watch that scheduled the reconcile.
+
+  A zone that fails now keeps the published serial in its status, so a later
+  successful render picks a serial greater than the one CoreDNS already holds
+  rather than restarting the numbering.
+
+  `Forward` zones were never affected: their records live in the Corefile, which
+  the `reload` plugin tracks by content.
+
 ### Changed
 
 - A conflict between records now costs only the name it affects, not the whole
