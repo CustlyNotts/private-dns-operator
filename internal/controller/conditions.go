@@ -29,6 +29,7 @@ const (
 	ConditionVolumeMounted        = "VolumeMounted"
 	ConditionReloadTriggered      = "ReloadTriggered"
 	ConditionLastKnownGoodApplied = "LastKnownGoodApplied"
+	ConditionRecordsExcluded      = "RecordsExcluded"
 	ConditionReady                = "Ready"
 )
 
@@ -45,6 +46,7 @@ var zoneConditionTypes = []string{
 	ConditionVolumeMounted,
 	ConditionReloadTriggered,
 	ConditionLastKnownGoodApplied,
+	ConditionRecordsExcluded,
 	ConditionReady,
 }
 
