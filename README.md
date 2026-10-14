@@ -63,7 +63,7 @@ helm upgrade --install private-dns-operator \
   --create-namespace
 ```
 
-That installs the newest release. Add `--version 1.1.0` to pin a specific one, which is what you want in anything reproducible.
+That installs the newest release. Add `--version 1.2.0` to pin a specific one, which is what you want in anything reproducible.
 
 See the [chart README](charts/private-dns-operator/README.md) for the full values reference.
 
@@ -389,17 +389,17 @@ oci://ghcr.io/custlynotts/charts/private-dns-operator --version <tag without v>
 install.yaml  (GitHub release asset)
 ```
 
-The GitHub release tag, image tag, chart `appVersion`, and chart package version are kept in lockstep by `make set-version`. For the current release `v1.1.0`, the artifacts are:
+The GitHub release tag, image tag, chart `appVersion`, and chart package version are kept in lockstep by `make set-version`. For the current release `v1.2.0`, the artifacts are:
 
 ```text
-ghcr.io/custlynotts/private-dns-operator:v1.1.0
-oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.1.0
+ghcr.io/custlynotts/private-dns-operator:v1.2.0
+oci://ghcr.io/custlynotts/charts/private-dns-operator --version 1.2.0
 ```
 
 Images carry SBOMs and build provenance. Verify a published image with:
 
 ```bash
-gh attestation verify oci://ghcr.io/custlynotts/private-dns-operator:v1.1.0 \
+gh attestation verify oci://ghcr.io/custlynotts/private-dns-operator:v1.2.0 \
   --repo CustlyNotts/private-dns-operator
 ```
 

@@ -4,7 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project
 follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## v1.2.0 - 2026-10-14
+
+If you use `unresolvedRecordPolicy: NXDOMAIN`, upgrade. On v1.1.0 and earlier
+those zones stopped picking up record changes for up to a day, and the operator
+reported success the whole time. The first reconcile after upgrading advances the
+serial, which makes CoreDNS reload the zone and pick up anything it missed.
+
+`Forward` zones were never affected.
 
 ### Fixed
 
