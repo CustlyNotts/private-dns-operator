@@ -300,6 +300,7 @@ kubectl get privatednsrecords -A
 - `PrivateDNSZone` uses a finalizer for zone cleanup.
 - `PrivateDNSRecord` deletion is handled by deterministic full-state rendering from remaining CRs.
 - CoreDNS `reload` is preferred. If `reload` is absent or volume items changed, the CoreDNS Deployment pod template is annotated to trigger a rollout restart.
+- For `NXDOMAIN` zones the SOA serial advances whenever the rendered records change, because CoreDNS's `file` plugin reloads a zone only when the serial increases. It deliberately stays put when nothing changed, so a steady-state reconcile renders byte-identical output.
 - Status is written only when it actually changes, so a steady-state cluster produces no reconcile churn.
 
 ## CoreDNS Target Configuration

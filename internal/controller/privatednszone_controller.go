@@ -175,14 +175,14 @@ func (r *PrivateDNSZoneReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err != nil {
 			// The zone suffix itself is unusable, so there is no key to hold a
 			// previous rendering under. The zone contributes nothing.
-			zoneResults[zone.Name] = failedResult(zone.Generation, reasonInvalidZone, err.Error())
+			zoneResults[zone.Name] = failedResult(zone, reasonInvalidZone, err.Error())
 			markZoneRecordsNotReady(outcomes, records.Items, zone.Name, err.Error())
 			continue
 		}
 
 		compiled, excluded, validationErrs := r.recordsForZone(*zone, normalizedZone, records.Items, outcomes)
 		if len(validationErrs) > 0 {
-			result := failedResult(zone.Generation, reasonInvalidRecordSet, validationErrs[0].Error())
+			result := failedResult(zone, reasonInvalidRecordSet, validationErrs[0].Error())
 			r.holdLastKnownGood(zone, normalizedZone, previousBlocks, previousManagedKeys, &cm, &result, &directives, zoneFiles)
 			zoneResults[zone.Name] = result
 			markZoneRecordsNotReady(outcomes, records.Items, zone.Name, validationErrs[0].Error())
@@ -191,9 +191,12 @@ func (r *PrivateDNSZoneReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			continue
 		}
 
-		zoneFile, err := dnsrender.RenderZone(*zone, compiled, time.Now())
+		zoneFile, err := dnsrender.RenderZone(*zone, compiled, time.Now(), dnsrender.PreviousRender{
+			Serial: zone.Status.Serial,
+			Hash:   zone.Status.LastAppliedHash,
+		})
 		if err != nil {
-			result := failedResult(zone.Generation, reasonZoneRenderFailed, err.Error())
+			result := failedResult(zone, reasonZoneRenderFailed, err.Error())
 			r.holdLastKnownGood(zone, normalizedZone, previousBlocks, previousManagedKeys, &cm, &result, &directives, zoneFiles)
 			zoneResults[zone.Name] = result
 			markZoneRecordsNotReady(outcomes, records.Items, zone.Name, err.Error())
@@ -435,7 +438,7 @@ func (r *PrivateDNSZoneReconciler) reportCoreDNSUnavailable(
 		if !zone.DeletionTimestamp.IsZero() {
 			continue
 		}
-		results[zone.Name] = failedResult(zone.Generation, reasonCoreDNSUnavailable, message)
+		results[zone.Name] = failedResult(zone, reasonCoreDNSUnavailable, message)
 		markZoneRecordsNotReady(outcomes, records, zone.Name, message)
 	}
 
@@ -772,11 +775,16 @@ func recordKey(namespace string, name string) string {
 	return namespace + "/" + name
 }
 
-func failedResult(generation int64, reason string, message string) zoneResult {
+func failedResult(zone *dnsv1alpha1.PrivateDNSZone, reason string, message string) zoneResult {
 	return zoneResult{
 		conditions: []metav1.Condition{
-			condition(ConditionReady, metav1.ConditionFalse, reason, message, generation),
+			condition(ConditionReady, metav1.ConditionFalse, reason, message, zone.Generation),
 		},
+		// Keep the published serial and body hash. Dropping them would let the
+		// next successful render start numbering from scratch and land on a
+		// serial CoreDNS has already seen, which it would refuse to reload.
+		serial:          zone.Status.Serial,
+		lastAppliedHash: zone.Status.LastAppliedHash,
 	}
 }
 

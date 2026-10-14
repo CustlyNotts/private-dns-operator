@@ -19,7 +19,9 @@ package dns
 import (
 	"crypto/sha1"
 	"fmt"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,7 +32,51 @@ type ZoneFile struct {
 	Key     string
 	Content string
 	Serial  string
-	Hash    string
+
+	// Hash digests the zone body with the serial held out, so it changes only
+	// when the records do. That is what lets an unchanged zone keep its serial.
+	Hash string
+}
+
+// PreviousRender is what the last successful render of a zone produced. The
+// serial has to be carried forward because CoreDNS's file plugin reloads a zone
+// only when the SOA serial increases, so a new serial must be greater than the
+// one CoreDNS is already serving.
+type PreviousRender struct {
+	Serial string
+	Hash   string
+}
+
+// serialPlaceholder stands in for the serial while the body is hashed. The
+// serial cannot be part of its own input, and hashing the body without it is
+// what keeps an unchanged zone byte-identical across reconciles: a serial that
+// moved every pass would change the content, which would write status, which
+// would retrigger the watch that scheduled the reconcile.
+const serialPlaceholder = "@@SERIAL@@"
+
+// nextSerial returns a serial strictly greater than previous, preferring the
+// conventional YYYYMMDDnn form.
+//
+// Monotonicity is the hard requirement, readability only a preference: CoreDNS
+// ignores a zone whose serial did not advance, so going backwards would strand
+// it on stale records until the next restart.
+func nextSerial(previous string, now time.Time) string {
+	candidate := now.UTC().Format("20060102") + "01"
+
+	prev, err := strconv.ParseUint(previous, 10, 32)
+	if err != nil {
+		return candidate
+	}
+	if value, err := strconv.ParseUint(candidate, 10, 32); err == nil && value > prev {
+		return candidate
+	}
+
+	// Same day as the last render, or the clock went backwards. Increment rather
+	// than reuse, so the change is still visible to CoreDNS.
+	if prev >= math.MaxUint32 {
+		return strconv.FormatUint(math.MaxUint32, 10)
+	}
+	return strconv.FormatUint(prev+1, 10)
 }
 
 func ZoneFileKey(zone string) string {
@@ -44,7 +90,7 @@ func ZoneFileKey(zone string) string {
 	return fmt.Sprintf("%s-%x.db", base, sum[:3])
 }
 
-func RenderZone(zone dnsv1alpha1.PrivateDNSZone, records []Record, now time.Time) (ZoneFile, error) {
+func RenderZone(zone dnsv1alpha1.PrivateDNSZone, records []Record, now time.Time, previous PreviousRender) (ZoneFile, error) {
 	normalizedZone, err := NormalizeZone(zone.Spec.Zone)
 	if err != nil {
 		return ZoneFile{}, err
@@ -62,12 +108,11 @@ func RenderZone(zone dnsv1alpha1.PrivateDNSZone, records []Record, now time.Time
 		return ZoneFile{}, errs[0]
 	}
 
-	serial := now.UTC().Format("2006010201")
 	var b strings.Builder
 	fmt.Fprintf(&b, "$ORIGIN %s\n", normalizedZone)
 	fmt.Fprintf(&b, "$TTL %d\n", ttl)
 	fmt.Fprintf(&b, "@ IN SOA ns.dns.%s hostmaster.%s (\n", normalizedZone, normalizedZone)
-	fmt.Fprintf(&b, "  %s ; serial\n", serial)
+	fmt.Fprintf(&b, "  %s ; serial\n", serialPlaceholder)
 	b.WriteString("  7200       ; refresh\n")
 	b.WriteString("  3600       ; retry\n")
 	b.WriteString("  1209600    ; expire\n")
@@ -84,13 +129,22 @@ func RenderZone(zone dnsv1alpha1.PrivateDNSZone, records []Record, now time.Time
 		}
 	}
 
-	content := b.String()
-	sum := sha1.Sum([]byte(content))
+	body := b.String()
+	sum := sha1.Sum([]byte(body))
+	hash := fmt.Sprintf("%x", sum[:])
+
+	// Reuse the serial when the records are unchanged, so a steady-state
+	// reconcile renders byte-identical output and writes nothing.
+	serial := previous.Serial
+	if serial == "" || hash != previous.Hash {
+		serial = nextSerial(previous.Serial, now)
+	}
+
 	return ZoneFile{
 		Key:     ZoneFileKey(normalizedZone),
-		Content: content,
+		Content: strings.Replace(body, serialPlaceholder, serial, 1),
 		Serial:  serial,
-		Hash:    fmt.Sprintf("%x", sum[:]),
+		Hash:    hash,
 	}, nil
 }
 
