@@ -16,15 +16,15 @@ helm upgrade --install private-dns-operator \
   --create-namespace
 ```
 
-That installs the newest release. Add `--version 1.1.0` to pin a specific one.
+That installs the newest release. Add `--version 1.2.0` to pin a specific one.
 
 The chart installs its CRDs from `crds/`. Helm does not upgrade or delete CRDs
 on `helm upgrade` or `helm uninstall`, so apply CRD changes yourself when a
 release notes them:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.1.0/config/crd/bases/dns.custlynotts.io_privatednszones.yaml
-kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.1.0/config/crd/bases/dns.custlynotts.io_privatednsrecords.yaml
+kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.2.0/config/crd/bases/dns.custlynotts.io_privatednszones.yaml
+kubectl apply -f https://raw.githubusercontent.com/CustlyNotts/private-dns-operator/v1.2.0/config/crd/bases/dns.custlynotts.io_privatednsrecords.yaml
 ```
 
 ## Requirements
